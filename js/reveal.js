@@ -672,6 +672,7 @@
 			backgroundSize: slide.getAttribute( 'data-background-size' ),
 			backgroundImage: slide.getAttribute( 'data-background-image' ),
 			backgroundVideo: slide.getAttribute( 'data-background-video' ),
+			backgroundIframe: slide.getAttribute( 'data-background-iframe' ),
 			backgroundColor: slide.getAttribute( 'data-background-color' ),
 			backgroundRepeat: slide.getAttribute( 'data-background-repeat' ),
 			backgroundPosition: slide.getAttribute( 'data-background-position' ),
@@ -696,11 +697,12 @@
 		// Create a hash for this combination of background settings.
 		// This is used to determine when two slide backgrounds are
 		// the same.
-		if( data.background || data.backgroundColor || data.backgroundImage || data.backgroundVideo ) {
+		if( data.background || data.backgroundColor || data.backgroundImage || data.backgroundVideo || data.backgroundIframe ) {
 			element.setAttribute( 'data-background-hash', data.background +
 															data.backgroundSize +
 															data.backgroundImage +
 															data.backgroundVideo +
+															data.backgroundIframe +
 															data.backgroundColor +
 															data.backgroundRepeat +
 															data.backgroundPosition +
@@ -1875,7 +1877,7 @@
 	/**
 	 * Toggles the auto slide mode on and off.
 	 *
-	 * @param {Boolean} override Optional flag which sets the desired state. 
+	 * @param {Boolean} override Optional flag which sets the desired state.
 	 * True means autoplay starts, false means it stops.
 	 */
 
@@ -2591,14 +2593,15 @@
 				background.setAttribute( 'data-loaded', 'true' );
 
 				var backgroundImage = slide.getAttribute( 'data-background-image' ),
-					backgroundVideo = slide.getAttribute( 'data-background-video' );
+					backgroundVideo = slide.getAttribute( 'data-background-video' ),
+					backgroundIframe = slide.getAttribute( 'data-background-iframe' );
 
 				// Images
 				if( backgroundImage ) {
 					background.style.backgroundImage = 'url('+ backgroundImage +')';
 				}
 				// Videos
-				else if ( backgroundVideo ) {
+				else if ( backgroundVideo && !isSpeakerNotes() ) {
 					var video = document.createElement( 'video' );
 
 					// Support comma separated lists of video sources
@@ -2607,6 +2610,17 @@
 					} );
 
 					background.appendChild( video );
+				}
+				// Iframes
+				else if ( backgroundIframe ) {
+					var iframe = document.createElement( 'iframe' );
+						iframe.setAttribute( 'src', backgroundIframe );
+						iframe.style.width  = '100%';
+						iframe.style.height = '100%';
+						iframe.style.maxHeight = '100%';
+						iframe.style.maxWidth = '100%';
+
+					background.appendChild( iframe );
 				}
 			}
 		}
@@ -3317,7 +3331,7 @@
 			// - The presentation isn't paused
 			// - The overview isn't active
 			// - The presentation isn't over
-			if( autoSlide && !autoSlidePaused && !isPaused() && !isOverview() && ( !Reveal.isLastSlide() || config.loop === true ) ) {
+			if( autoSlide && !autoSlidePaused && !isPaused() && !isOverview() && ( !Reveal.isLastSlide() || availableFragments().next || config.loop === true ) ) {
 				autoSlideTimeout = setTimeout( navigateNext, autoSlide );
 				autoSlideStartTime = Date.now();
 			}
@@ -3427,7 +3441,14 @@
 			}
 			else {
 				// Fetch the previous horizontal slide, if there is one
-				var previousSlide = dom.wrapper.querySelector( HORIZONTAL_SLIDES_SELECTOR + '.past:nth-child(' + indexh + ')' );
+				var previousSlide;
+
+				if( config.rtl ) {
+					previousSlide = toArray( dom.wrapper.querySelectorAll( HORIZONTAL_SLIDES_SELECTOR + '.future' ) ).pop();
+				}
+				else {
+					previousSlide = toArray( dom.wrapper.querySelectorAll( HORIZONTAL_SLIDES_SELECTOR + '.past' ) ).pop();
+				}
 
 				if( previousSlide ) {
 					var v = ( previousSlide.querySelectorAll( 'section' ).length - 1 ) || undefined;
@@ -3440,13 +3461,21 @@
 	}
 
 	/**
-	 * Same as #navigatePrev() but navigates forwards.
+	 * The reverse of #navigatePrev().
 	 */
 	function navigateNext() {
 
 		// Prioritize revealing fragments
 		if( nextFragment() === false ) {
-			availableRoutes().down ? navigateDown() : navigateRight();
+			if( availableRoutes().down ) {
+				navigateDown();
+			}
+			else if( config.rtl ) {
+				navigateLeft();
+			}
+			else {
+				navigateRight();
+			}
 		}
 
 		// If auto-sliding is enabled we need to cue up
